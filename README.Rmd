@@ -1,0 +1,104 @@
+---
+title: "pee_poop_times"
+author: "Justin Rose"
+date: "1/10/2021"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, message=F, warning=F)
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(zoo)
+```
+
+# Background
+
+We recently got a new golden retriever puppy! In our quest to avoid any accidents inside the house (and the product of having way too much time on our hands due to COVID), I decided to track when our little Lambeau went pee and poop over the span of a month to see if I could try and mitigate the amount of indoor accidents. 
+
+I started tracking this by setting up a routine through my iPhone which would populate append a note with the exact time and type of potty break that occured. Then I exported this data as a .csv used here.
+
+[Here's a link on how I set up the data collection aspect of this!](https://www.makeuseof.com/ways-to-quickly-start-a-new-iphone-note/#:~:text=Going%20forward%2C%20anytime%20you%20need,hit%20Done%20to%20save%20it.)
+
+I've also included a screenshot of the routine I created to log Lambeau's poop in case you'd like to use that
+
+# Data Cleaning
+
+```{r data_cleaning}
+#most of the data cleaning steps here involve formatting the character variable into a date variable so we can plot out the times, as well as dropping a couple weird times that got into our data
+pp_dta <- read_csv('pee_poop_times.csv') %>% 
+  mutate(inside=replace_na(inside,"no accident"),
+         date_noest = str_remove(time," EST")) %>% 
+  separate(date_noest, c("date","time_clean"),sep = ",",remove=F) %>% 
+  mutate(date = mdy(date),
+         time_rounded = 
+             round_date(
+               parse_date_time(
+                 paste(
+                   Sys.Date(),
+                   time_clean), "Ymd IMS p"),
+               "30 min")
+         ) %>% 
+  filter(!is.na(time_rounded)) 
+```
+
+
+```{r graph_creation, echo=FALSE}
+#I used custom colors for flagging accidents (#FF0000) vs regular pee breaks (#d5b60a) and poop breaks (#7b5c00) 
+pee_hist <- pp_dta %>%
+  filter(type == 'pee') %>% 
+  ggplot(aes(x = time_rounded, fill = inside)) + 
+  geom_histogram(binwidth = 60*30) + 
+  scale_y_continuous(breaks = seq(0,10,2)) +
+  scale_x_datetime(breaks = "2 hours", date_labels = "%H:%M") + 
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45), legend.position = 'bottom')  + 
+  scale_fill_manual(values = c("#FF0000", "#d5b60a")) +
+  labs(y="# of Times",
+       title="Pee Times of Lambeau",
+       x="Time of Incident",
+       fill="Accident?",
+       subtitle="From Dec '20 to Jan '21"
+       )+
+  annotate("label",x=as_datetime("2023-05-06 03:00:00",format="%Y-%m-%d %H:%M:%S"),y=4,label="His two accidents \n happened at his usual \n pee times--our fault!")
+
+ poophist <- pp_dta %>%
+   filter(type == 'poop') %>% 
+  ggplot(aes(x = time_rounded, fill = inside)) + 
+   geom_histogram(binwidth = 60*30)  + 
+   scale_y_continuous(breaks = seq(0,10,2)) +
+  scale_x_datetime(breaks = "2 hours", date_labels = "%H:%M") + 
+  theme_minimal()+
+   theme(axis.text.x = element_text(angle = 45), legend.position = 'bottom') + 
+   scale_fill_manual(values = c("#7b5c00"))+
+  labs(y="# of Times",
+       title="Poop Times of Lambeau",
+       x="Time of Incident",
+       fill="Accident?",
+       subtitle="From Dec '20 to Jan '21")
+
+ 
+ 
+```
+
+# Visuals
+
+```{r}
+pee_hist
+```
+
+
+```{r}
+ 	poophist
+```
+
+# Results
+
+Thankfully, Lambeau was a pretty good boy and had minimal accidents inside! Of the two accidents that did happen, they were more our fault than him not understanding not to go inside, as you can see they happened during his usual pee times (most likely due to us being distracted and not noticing his cues). 
+
+One note to mention is that during this time of his potty training, we were taking him out roughly every hour while he was awake, as well as immediately any time he finished a big play session. YMMV on your capacity to do this, but this strategy combined with limiting water near bedtime helped tremendously in avoiding any surprise accidents.
+
+You probably don't need to go as intense as we did with the hourly breaks on top of creating a whole tracking workflow for your new pup's poops and pees (COVID quarantine will do that to you), but make sure to take some tips from the [AKC guide on potty training your puppy!](https://www.akc.org/expert-advice/training/how-to-potty-train-a-puppy/)
+
+And of course, feel free to use this repo if you'd like to visualize your darling's poop/pee schedule yourself!
